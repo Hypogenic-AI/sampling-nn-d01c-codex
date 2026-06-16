@@ -1,0 +1,29 @@
+\section{Methodology}
+\label{sec:methodology}
+
+\input{figures/method_overview}
+
+\para{Problem setup.}
+Let $f_\theta$ be a classifier with feature extractor $g_\theta$, penultimate representation $\vh \in \sR^d$, and linear classifier head $c_\theta$. For an input $\vx$, deterministic inference computes
+\begin{equation}
+    \vh = g_\theta(\vx), \qquad \vp = \softmax(c_\theta(\vh)).
+\end{equation}
+The deterministic prediction is $\argmax_y p_y$. Hidden sampling replaces $\vh$ with a stochastic $\tilde{\vh}^{(s)}$ before the classifier head, then averages predictive probabilities:
+\begin{equation}
+    \bar{\vp}_S(\vx) = \frac{1}{S}\sum_{s=1}^S \softmax(c_\theta(\tilde{\vh}^{(s)})).
+\end{equation}
+This differs from final-softmax sampling, which leaves $\vh$ fixed, draws labels $y^{(s)} \sim \Categorical(\vp)$, and estimates an empirical predictive distribution from sample counts.
+
+\para{Inference methods.}
+We evaluate six inference conditions. \deterministic uses the standard forward pass. \outputsample samples labels from the final softmax and averages one-hot outcomes across $S$ samples. \hiddencategorical forms $q_i = \softmax(|h_i|/\tau)$ over the 128 penultimate dimensions, draws a target 25\% of dimensions, and rescales sampled coordinates by inverse probability. \sap samples a Bernoulli mask over hidden dimensions with probabilities proportional to $|h_i|$, targets a 35\% keep fraction, and rescales survivors by inverse probability \cite{dhillon2018stochastic}. \gaussian adds zero-mean noise proportional to the per-example hidden standard deviation, with scale 0.35. \mcdropout uses a dropout-trained model with dropout active at inference; \dropouteval uses the same dropout-trained model with dropout disabled.
+
+\para{Datasets.}
+We use local HuggingFace snapshots of \mnist \cite{lecun1998gradient} and \fashionmnist \cite{xiao2017fashion}. For each seed, the original training split is stratified into 20,000 training examples and 5,000 validation examples, and the official 10,000-example test set is held out for final evaluation. Normalization uses only the training subset mean and standard deviation. \tabref{tab:datasets} summarizes the splits.
+
+\input{tables/datasets}
+
+\para{Model and training.}
+The classifier is a compact \cnn with two convolutional blocks and a 128-dimensional penultimate hidden layer. We train two variants for each dataset and seed: a deterministic model with dropout probability 0, and a dropout model with dropout probability 0.25 before the classifier head. We use seeds 42, 123, and 456. Training uses batch size 256, Adam-style optimization with learning rate 0.001, weight decay 0.0001, up to 8 epochs, early stopping patience 3, and mixed precision on `cuda:0'. The recorded environment used Python 3.12.8, PyTorch 2.12.0+cu130, CUDA 13.0, and an NVIDIA RTX A6000 GPU.
+
+\para{Metrics and statistics.}
+We report accuracy, \nll, \ece with 10 bins \cite{guo2017calibration}, \brier score, predictive entropy, mean probability variance across Monte Carlo samples, per-class accuracy, and evaluation time. Stochastic methods use $S \in \{1,5,20\}$ samples. Primary tables report $S=20$ unless noted. For deterministic-model stochastic methods, we compare each $S=20$ condition against deterministic inference using paired seed-level differences, paired $t$ tests, Wilcoxon signed-rank tests where supported, Cohen's $d_z$, 95\% confidence intervals, and Holm correction within dataset/metric families. With only three seeds, we treat $p$-values as descriptive and emphasize effect sizes and raw differences.

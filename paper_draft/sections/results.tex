@@ -1,0 +1,65 @@
+\section{Results}
+\label{sec:results}
+
+\para{Main result.}
+\tabref{tab:main_results} reports primary metrics. The central pattern is that hidden categorical sampling behaves unlike output sampling. On \mnist, \hiddencategorical at $S=20$ reaches 79.41\% accuracy, compared with 98.55\% for deterministic inference and 98.51\% for \outputsample. On \fashionmnist, it reaches 66.30\%, compared with 88.77\% and 88.53\%. It also produces much higher \nll, \ece, entropy, and probability variance.
+
+\input{tables/main_results}
+
+\para{SAP and Gaussian sampling preserve accuracy.}
+The less discrete hidden interventions are much less disruptive. On \mnist, \sap and \gaussian both remain within 0.04 percentage points of deterministic accuracy at $S=20$. On \fashionmnist, \sap is 0.15 points below deterministic accuracy and \gaussian is 0.02 points below. Their main visible effect is uncertainty: \sap increases entropy from 0.040 to 0.100 on \mnist and from 0.286 to 0.371 on \fashionmnist, while \gaussian increases entropy to 0.053 and 0.317.
+
+\begin{figure}[t]
+    \centering
+    \begin{minipage}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/accuracy_primary.png}
+        \vspace{-0.7em}
+        \centerline{\small (a) Accuracy}
+    \end{minipage}
+    \begin{minipage}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/ece_primary.png}
+        \vspace{-0.7em}
+        \centerline{\small (b) Expected calibration error}
+    \end{minipage}
+    \caption{Primary accuracy and calibration results. \hiddencategorical sharply reduces accuracy and increases \ece on both datasets. \sap, \gaussian, and \mcdropout preserve accuracy much more closely.}
+    \label{fig:primary}
+\end{figure}
+
+\para{Output sampling is a readout-level intervention.}
+Final-softmax sampling preserves top-line accuracy when $S$ is large enough because the underlying softmax probabilities are unchanged. However, the evaluated sampled distribution is a count distribution over 20 one-hot draws. This coarse empirical distribution worsens \nll from 0.044 to 0.112 on \mnist and from 0.310 to 0.734 on \fashionmnist, even though accuracy remains within 0.23 points of deterministic inference.
+
+\para{Monte Carlo averaging helps but does not fix categorical hidden sampling.}
+\tabref{tab:sample_count} shows the sample-count sweep. More samples improve every stochastic method, but the categorical hidden sampler remains far below deterministic inference. On \mnist, it rises from 62.28\% at $S=1$ to 79.41\% at $S=20$; on \fashionmnist, it rises from 50.06\% to 66.30\%. In contrast, \sap and \gaussian approach deterministic accuracy by $S=20$, and \mcdropout slightly improves the dropout-trained model's averaged prediction.
+
+\input{tables/sample_count}
+
+\begin{figure}[t]
+    \centering
+    \begin{minipage}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/accuracy_sample_sweep.png}
+        \vspace{-0.7em}
+        \centerline{\small (a) Accuracy}
+    \end{minipage}
+    \begin{minipage}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/entropy_sample_sweep.png}
+        \vspace{-0.7em}
+        \centerline{\small (b) Entropy}
+    \end{minipage}
+    \begin{minipage}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/variance_sample_sweep.png}
+        \vspace{-0.7em}
+        \centerline{\small (c) Probability variance}
+    \end{minipage}
+    \caption{Sample-count effects for stochastic inference. Monte Carlo averaging stabilizes predictions, but \hiddencategorical remains high-entropy and low-accuracy even at $S=20$.}
+    \label{fig:sample_sweep}
+\end{figure}
+
+\para{Paired statistical comparisons.}
+\tabref{tab:paired_differences} summarizes key paired differences against deterministic inference for deterministic-model methods at $S=20$. \hiddencategorical lowers accuracy by 19.13 percentage points on \mnist and 22.46 points on \fashionmnist. These accuracy differences have large paired effect sizes ($d_z=-2.07$ and $-1.66$), although Holm-corrected $p$-values are not below 0.05 with only three seeds. Calibration and entropy shifts are more consistent: \hiddencategorical increases \ece by 0.252 on \mnist ($p_{\mathrm{Holm}}=0.026$) and entropy by 1.265 on \mnist ($p_{\mathrm{Holm}}=0.015$) and 1.178 on \fashionmnist ($p_{\mathrm{Holm}}=0.011$).
+
+\input{tables/paired_differences}

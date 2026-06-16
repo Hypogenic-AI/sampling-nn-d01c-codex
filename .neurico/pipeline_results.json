@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "stages": {
+    "resource_finder": {
+      "success": true,
+      "completion_marker": "/workspaces/sampling-nn-d01c-codex/.resource_finder_complete",
+      "outputs": {
+        "literature_review": "/workspaces/sampling-nn-d01c-codex/literature_review.md",
+        "resources_catalog": "/workspaces/sampling-nn-d01c-codex/resources.md",
+        "papers_dir": "/workspaces/sampling-nn-d01c-codex/papers",
+        "datasets_dir": "/workspaces/sampling-nn-d01c-codex/datasets",
+        "code_dir": "/workspaces/sampling-nn-d01c-codex/code"
+      },
+      "log_file": "/workspaces/sampling-nn-d01c-codex/logs/resource_finder_codex.log",
+      "transcript_file": "/workspaces/sampling-nn-d01c-codex/logs/resource_finder_codex_transcript.jsonl",
+      "elapsed_time": 920.6623868942261
+    },
+    "experiment_runner": {
+      "success": true,
+      "return_code": 0,
+      "elapsed_time": 861.8020558357239,
+      "log_file": "/workspaces/sampling-nn-d01c-codex/logs/execution_codex.log",
+      "transcript_file": "/workspaces/sampling-nn-d01c-codex/logs/execution_codex_transcript.jsonl"
+    }
+  },
+  "work_dir": "/workspaces/sampling-nn-d01c-codex"
+}

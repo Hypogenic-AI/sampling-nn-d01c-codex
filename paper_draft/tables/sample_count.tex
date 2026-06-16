@@ -1,0 +1,23 @@
+\begin{table}[t]
+    \centering
+    \caption{Accuracy across Monte Carlo sample counts. Values are mean $\pm$ standard deviation across three seeds. Increasing $S$ helps stochastic methods, but \hiddencategorical remains far below deterministic inference.}
+    \label{tab:sample_count}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{@{}lllccc@{}}
+        \toprule
+        Dataset & Model & Method & $S=1$ & $S=5$ & $S=20$ \\
+        \midrule
+        \mnist & deterministic & \outputsample & 97.86 $\pm$ 0.19 & 98.39 $\pm$ 0.19 & 98.51 $\pm$ 0.18 \\
+        \mnist & deterministic & \hiddencategorical & 62.28 $\pm$ 6.26 & 74.36 $\pm$ 8.36 & 79.41 $\pm$ 9.27 \\
+        \mnist & deterministic & \sap & 97.22 $\pm$ 0.23 & 98.35 $\pm$ 0.07 & 98.51 $\pm$ 0.12 \\
+        \mnist & deterministic & \gaussian & 98.20 $\pm$ 0.18 & 98.49 $\pm$ 0.11 & 98.53 $\pm$ 0.12 \\
+        \mnist & dropout & \mcdropout & 98.44 $\pm$ 0.17 & 98.77 $\pm$ 0.18 & 98.82 $\pm$ 0.14 \\
+        \midrule
+        \fashionmnist & deterministic & \outputsample & 84.29 $\pm$ 0.40 & 87.58 $\pm$ 0.37 & 88.53 $\pm$ 0.13 \\
+        \fashionmnist & deterministic & \hiddencategorical & 50.06 $\pm$ 7.19 & 60.52 $\pm$ 11.45 & 66.30 $\pm$ 13.40 \\
+        \fashionmnist & deterministic & \sap & 86.04 $\pm$ 0.38 & 88.29 $\pm$ 0.20 & 88.61 $\pm$ 0.03 \\
+        \fashionmnist & deterministic & \gaussian & 87.89 $\pm$ 0.14 & 88.66 $\pm$ 0.07 & 88.75 $\pm$ 0.16 \\
+        \fashionmnist & dropout & \mcdropout & 88.23 $\pm$ 0.17 & 88.82 $\pm$ 0.17 & 89.00 $\pm$ 0.25 \\
+        \bottomrule
+    \end{tabular}}
+\end{table}

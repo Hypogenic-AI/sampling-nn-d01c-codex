@@ -1,0 +1,752 @@
+You are an academic paper writer. Generate a complete NEURIPS style paper
+based on the experiment results provided.
+
+════════════════════════════════════════════════════════════════════════════════
+                         IMPORTANT: BEFORE YOU START
+════════════════════════════════════════════════════════════════════════════════
+
+Before writing any content, you MUST complete these steps:
+
+1. READ THE SKILL: Review the paper-writer skill at .codex/skills/paper-writer/SKILL.md
+2. READ THE STYLE GUIDE: Study templates/paper_writing/lab_style_guide.md carefully
+3. REVIEW EXAMPLES: Browse paper_examples/ for formatting and language patterns:
+   - Look at sections/1.introduction.tex for language style
+   - Look at tables/*.tex for table formatting
+   - Look at commands/*.tex for macro usage
+4. VERIFY COMMAND TEMPLATES: Command templates (math.tex, general.tex, macros.tex) are pre-copied to paper_draft/commands/
+
+CRITICAL: Reference example papers for FORMATTING and LANGUAGE STYLE only.
+Do NOT copy content, phrasing, or narrative structure from the example papers.
+The examples are in a different research domain - focus only on presentation style.
+
+════════════════════════════════════════════════════════════════════════════════
+                            EXPERIMENT REPORT
+════════════════════════════════════════════════════════════════════════════════
+
+# Sampling Neural Network: Experimental Report
+
+## 1. Executive Summary
+
+This study tested whether sampling from an intermediate activation distribution changes neural-network behavior differently from deterministic inference or final-softmax sampling. The answer is yes: hidden-layer sampling produces distinct uncertainty and calibration behavior, but the naive "sample hidden units like a softmax" version is highly disruptive.
+
+Across MNIST and Fashion-MNIST, SAP-style and Gaussian hidden sampling preserved accuracy almost exactly, while categorical hidden activation sampling reduced accuracy sharply even after 20 Monte Carlo samples. Final-softmax sampling preserved accuracy at 20 samples, but it degraded empirical NLL because the evaluated sampled distribution assigns coarse count-based probability mass. The practical implication is that hidden sampling is a real representational intervention, not just output sampling moved earlier; it needs a carefully designed distribution and training objective to be useful.
+
+## 2. Research Question & Hypothesis
+
+**Question:** What happens if an intermediate neural-network activation vector is treated as a distribution and sampled from, analogous to sampling from the final softmax layer?
+
+**Hypothesis:** Sampling intermediate activations will alter network behavior in ways that differ from deterministic inference, final-softmax sampling, and common stochastic baselines.
+
+The experiments intentionally do not claim that stochastic hidden activations are new. The novelty here is isolating the submitter's specific framing against output-only sampling, SAP-style activation sampling, Gaussian activation noise, and MC dropout in one controlled pipeline.
+
+## 3. Literature Review Summary
+
+The pre-gathered review identified several close lines of work:
+
+- **Stochastic Activation Pruning (SAP; Dhillon et al., 2018):** samples activation indices with probability proportional to activation magnitude and rescales survivors.
+- **Simple and Effective Stochastic Neural Networks (Yu et al., 2021):** models Gaussian activation uncertainty and evaluates robustness, pruning, and calibration.
+- **Activation-level uncertainty (Morales-Alvarez et al., 2021):** shifts uncertainty from weights to activation functions.
+- **Noisy activations, local reparameterization, MC dropout, VIB, and stochastic depth:** all inject stochasticity before the final prediction, but with different goals and distributions.
+
+The gap from this review is that few experiments directly compare hidden activation sampling against final-softmax sampling as the isolated variable.
+
+## 4. Data Construction
+
+Datasets were loaded from local HuggingFace `save_to_disk` snapshots under `datasets/`.
+
+| Dataset | Train | Validation | Test | Notes |
+|---|---:|---:|---:|---|
+| MNIST | 20,000 | 5,000 | 10,000 | Stratified subset from the original train split; official test set. |
+| Fashion-MNIST | 20,000 | 5,000 | 10,000 | Balanced stratified subset; official test set. |
+
+Normalization used only the training subset mean and standard deviation for each dataset and seed. Data metadata and class counts are saved in `results/data_metadata.csv`.
+
+## 5. Methodology
+
+I trained a compact CNN with two convolutional blocks and a 128-dimensional penultimate hidden layer. Two model variants were trained for each dataset and seed:
+
+- `deterministic`: dropout probability 0.
+- `dropout`: dropout probability 0.25 before the classifier head.
+
+The tested inference methods were:
+
+- `deterministic`: normal argmax inference.
+- `output_sample`: sample labels from the final softmax and average one-hot samples.
+- `hidden_categorical`: sample hidden dimensions from `softmax(abs(h) / tau)`, keep 25 percent draws, and rescale by inverse probability.
+- `sap`: Bernoulli mask hidden dimensions with probability proportional to activation magnitude, target keep fraction 35 percent, and inverse-probability rescaling.
+- `gaussian`: add activation noise proportional to per-example hidden standard deviation.
+- `dropout_eval`: dropout-trained model with dropout disabled.
+- `mc_dropout`: dropout-trained model with dropout active at inference.
+
+Each stochastic method was evaluated with `S in {1, 5, 20}` Monte Carlo samples. Results below use `S=20` for stochastic methods unless otherwise noted.
+
+**Hardware and software:** Python 3.12.8, PyTorch 2.12.0+cu130, CUDA 13.0, NumPy 2.4.6, pandas 3.0.3, scikit-learn 1.9.0, SciPy 1.17.1. Four NVIDIA RTX A6000 GPUs were visible; experiments used `cuda:0`. Batch size was 256, mixed precision was enabled, and total recorded GPU training time across 12 trained models was about 40 seconds.
+
+**Reproducibility:** Seeds were 42, 123, and 456. Raw metrics are in `results/metrics_raw.csv`; summaries are in `results/metrics_summary.csv`; statistical tests are in `results/statistical_tests.csv`.
+
+## 6. Results
+
+### Primary Metrics
+
+Accuracy is mean +/- standard deviation across three seeds. Other metrics are means.
+
+| Dataset | Model | Method | S | Accuracy | NLL | ECE | Entropy | Prob. variance |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| Fashion-MNIST | deterministic | deterministic | 1 | 88.77 +/- 0.16 | 0.310 | 0.010 | 0.286 | 0.0000 |
+| Fashion-MNIST | deterministic | gaussian | 20 | 88.75 +/- 0.16 | 0.310 | 0.008 | 0.317 | 0.0013 |
+| Fashion-MNIST | deterministic | hidden_categorical | 20 | 66.30 +/- 13.40 | 1.032 | 0.202 | 1.464 | 0.0228 |
+| Fashion-MNIST | deterministic | output_sample | 20 | 88.53 +/- 0.13 | 0.734 | 0.015 | 0.249 | 0.0143 |
+| Fashion-MNIST | deterministic | sap | 20 | 88.61 +/- 0.03 | 0.320 | 0.024 | 0.371 | 0.0037 |
+| Fashion-MNIST | dropout | dropout_eval | 1 | 89.06 +/- 0.36 | 0.305 | 0.008 | 0.282 | 0.0000 |
+| Fashion-MNIST | dropout | mc_dropout | 20 | 89.00 +/- 0.25 | 0.307 | 0.009 | 0.328 | 0.0011 |
+| MNIST | deterministic | deterministic | 1 | 98.55 +/- 0.12 | 0.044 | 0.002 | 0.040 | 0.0000 |
+| MNIST | deterministic | gaussian | 20 | 98.53 +/- 0.12 | 0.044 | 0.003 | 0.053 | 0.0004 |
+| MNIST | deterministic | hidden_categorical | 20 | 79.41 +/- 9.27 | 0.833 | 0.254 | 1.304 | 0.0197 |
+| MNIST | deterministic | output_sample | 20 | 98.51 +/- 0.18 | 0.112 | 0.003 | 0.032 | 0.0019 |
+| MNIST | deterministic | sap | 20 | 98.51 +/- 0.12 | 0.055 | 0.017 | 0.100 | 0.0017 |
+| MNIST | dropout | dropout_eval | 1 | 98.81 +/- 0.13 | 0.036 | 0.002 | 0.035 | 0.0000 |
+| MNIST | dropout | mc_dropout | 20 | 98.82 +/- 0.14 | 0.038 | 0.006 | 0.059 | 0.0005 |
+
+![Primary accuracy](figures/accuracy_primary.png)
+
+![Primary ECE](figures/ece_primary.png)
+
+### Sample Count Effects
+
+Monte Carlo averaging helped stochastic methods, but it did not make hidden categorical sampling benign. For MNIST, categorical hidden sampling improved from 62.28 percent accuracy at `S=1` to 79.41 percent at `S=20`, still far below deterministic 98.55 percent. On Fashion-MNIST it improved from 50.06 percent to 66.30 percent, still far below deterministic 88.77 percent.
+
+SAP and Gaussian noise behaved differently. On MNIST, SAP rose from 97.22 percent at `S=1` to 98.51 percent at `S=20`, and Gaussian rose from 98.20 percent to 98.53 percent. On Fashion-MNIST, SAP rose from 86.04 percent to 88.61 percent, and Gaussian rose from 87.89 percent to 88.75 percent.
+
+![Accuracy sample sweep](figures/accuracy_sample_sweep.png)
+
+![Entropy sample sweep](figures/entropy_sample_sweep.png)
+
+![Variance sample sweep](figures/variance_sample_sweep.png)
+
+### Statistical Tests
+
+Paired tests compare each deterministic-model stochastic method at `S=20` to deterministic inference across the three seeds. With only three seeds, p-values are descriptive and effect sizes are more informative.
+
+Key paired differences:
+
+- Hidden categorical accuracy dropped by 19.13 percentage points on MNIST and 22.46 points on Fashion-MNIST. Holm-corrected p-values were not below 0.05 because `n=3` and variance was large, but paired effect sizes were large (`dz=-2.07` and `dz=-1.66`).
+- Hidden categorical ECE increased strongly: +0.252 on MNIST (`p_holm=0.026`, `dz=7.11`) and +0.192 on Fashion-MNIST (`p_holm=0.168`, `dz=2.73`).
+- Hidden categorical predictive entropy increased by +1.265 on MNIST (`p_holm=0.015`, `dz=8.06`) and +1.178 on Fashion-MNIST (`p_holm=0.011`, `dz=9.55`).
+- SAP preserved accuracy within 0.04 percentage points on MNIST and 0.15 points on Fashion-MNIST, but increased entropy on both datasets.
+- Final-softmax sampling at `S=20` preserved accuracy, but increased NLL by +0.069 on MNIST and +0.424 on Fashion-MNIST under the empirical sampled-probability evaluation.
+
+## 7. Analysis & Discussion
+
+The hypothesis is supported in the behavioral sense: sampling intermediate activations is not equivalent to sampling from the final softmax. Hidden categorical sampling perturbs the representation before the classifier head, and this changes errors, calibration, entropy, and probability variance in ways output sampling does not.
+
+The strongest finding is also a caution. The direct "softmax over hidden activations, sample dimensions, rescale" version is too destructive for a normally trained deterministic CNN. Even expectation-preserving rescaling and 20-sample averaging did not recover deterministic accuracy. This suggests that hidden categorical sampling needs sample-aware training, a better distribution, structured groups/channels instead of individual hidden dimensions, or a learned stochastic bottleneck.
+
+SAP and Gaussian hidden sampling were much less destructive. They show that intermediate stochasticity can be inserted post hoc without destroying accuracy, but their main effect here was to increase entropy and predictive variance rather than improve accuracy or calibration. MC dropout behaved similarly on the dropout-trained model.
+
+Final-softmax sampling behaved differently again. Accuracy recovered with enough samples because the underlying class probabilities remained unchanged, but empirical sampled probabilities were coarse, which hurt NLL. This reinforces that output sampling is a readout-level stochastic operation, while hidden sampling changes the computation itself.
+
+## 8. Limitations
+
+- Only MNIST and Fashion-MNIST were used. CIFAR-10 and CIFAR-100 were available locally but deferred to keep the automated execution bounded.
+- The architecture was intentionally small. Results may differ for ResNets, transformers, or models trained with stochastic hidden sampling from the start.
+- Hidden categorical sampling was applied to the penultimate vector only. Sampling channels or spatial maps might behave differently.
+- Statistical power is limited to three seeds, so p-values should not be overinterpreted.
+- Robustness attacks were not run. The literature warns that stochastic defenses require expectation-over-transformation attacks, which should be a separate controlled experiment.
+- NLL for `output_sample` evaluates empirical sampled probabilities, not the original analytic softmax distribution. This is intentional for sampled-behavior comparison but should not be read as the model's native probabilistic quality.
+
+## 9. Conclusions & Next Steps
+
+Sampling intermediate activations changes network behavior in novel ways compared with deterministic inference and final-softmax sampling. The naive categorical hidden sampler mainly damages learned representations, while SAP-style and Gaussian hidden sampling preserve accuracy and alter uncertainty.
+
+The next most useful experiment is sample-aware training: train the network with the exact hidden sampling mechanism active, then compare post-hoc sampling against trained-for-sampling inference. After that, test channel-level SAP/categorical sampling on CIFAR-10 with robustness and calibration metrics.
+
+## 10. Output Files
+
+- `planning.md`: preregistered motivation, novelty, and analysis plan.
+- `src/sampling_nn_experiment.py`: full training, inference, analysis, and plotting pipeline.
+- `results/metrics_raw.csv`: all seed-level metric rows.
+- `results/metrics_summary.csv`: mean/std/CI summary by method.
+- `results/statistical_tests.csv`: paired tests, confidence intervals, effect sizes, and Holm correction.
+- `results/data_metadata.csv`: split sizes, normalization statistics, and class counts.
+- `results/environment.json`: software, hardware, and config metadata.
+- `figures/*.png`: training, accuracy, calibration, entropy, and variance plots.
+
+## References
+
+- Dhillon et al. (2018), *Stochastic Activation Pruning for Robust Adversarial Defense*, local file `papers/2018_dhillon_stochastic_activation_pruning.pdf`.
+- Yu et al. (2021), *Simple and Effective Stochastic Neural Networks*, local file `papers/2021_yu_simple_effective_stochastic_neural_networks.pdf`.
+- Morales-Alvarez et al. (2021), *Activation-level uncertainty in deep neural networks*, local file `papers/2021_morales_activation_level_uncertainty.pdf`.
+- Gal and Ghahramani (2016), *Dropout as a Bayesian Approximation*, local file `papers/2016_gal_dropout_bayesian_approximation.pdf`.
+- Kingma, Salimans, and Welling (2015), *Variational Dropout and the Local Reparameterization Trick*, local file `papers/2015_kingma_variational_dropout_local_reparam.pdf`.
+- Jang et al. (2017), *Categorical Reparameterization with Gumbel-Softmax*, local file `papers/2017_jang_gumbel_softmax.pdf`.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                            RESEARCH PLAN
+════════════════════════════════════════════════════════════════════════════════
+
+# Sampling Neural Network: Research Plan
+
+## Motivation & Novelty Assessment
+
+### Why This Research Matters
+
+Neural networks are usually deterministic inside the model and stochastic only at the output when a class or token is sampled from a final softmax. If hidden activations can also be treated as a distribution to sample from, the model may express uncertainty, robustness, or diversity at a representational level rather than only at the final decision. This matters for reliable ML systems because activation-level stochasticity could change calibration, confidence, robustness, and sample efficiency without requiring fully Bayesian weights.
+
+### Gap in Existing Work
+
+The gathered literature shows several related mechanisms: stochastic activation pruning (SAP), Gaussian activation uncertainty, noisy activations, MC dropout, variational dropout, stochastic depth, and variational information bottlenecks. The gap is that these methods are rarely compared against final-softmax sampling as the isolated control, and many evaluate a specialized training objective rather than asking the direct user question: what happens if we sample from an intermediate activation distribution in an otherwise standard network?
+
+### Our Novel Contribution
+
+This execution tests hidden activation sampling as an intervention family on the same trained CNN architecture. The core contrast is between output-only stochasticity and hidden-layer stochasticity, including categorical hidden-unit sampling, SAP-style magnitude-proportional masking, Gaussian activation noise, and MC dropout. The contribution is not a claim that stochastic hidden units are new; it is a focused empirical isolation of the behavioral effect of sampling from intermediate activations compared with sampling only at the final softmax.
+
+### Experiment Justification
+
+- Experiment 1: Train deterministic and dropout CNNs on MNIST and Fashion-MNIST. This verifies the pipeline and creates controlled base models for hidden sampling.
+- Experiment 2: Evaluate deterministic argmax, final-softmax sampling, categorical hidden sampling, SAP-style hidden sampling, Gaussian activation noise, and MC dropout. This directly tests whether hidden sampling changes accuracy, NLL, calibration, entropy, and prediction variability beyond output sampling.
+- Experiment 3: Sweep Monte Carlo sample count `S in {1, 5, 20}` at inference. This tests whether hidden sampling behaves like final softmax sampling, where averaging more samples should stabilize predictions, or whether it introduces persistent representation noise.
+- Experiment 4: Run each condition across three seeds and paired statistical tests. This guards against interpreting single-run stochastic artifacts as method effects.
+
+## Research Question
+
+Does sampling from a distribution over intermediate neural activations change classification behavior compared with deterministic inference, final-softmax sampling, dropout, and simple activation-noise baselines?
+
+## Background and Motivation
+
+Prior work establishes that stochastic internal representations can be useful for robustness, uncertainty, pruning, and calibration. SAP samples activation units with probability proportional to activation magnitude, Gaussian stochastic neural networks predict activation uncertainty, MC dropout keeps hidden stochasticity active at inference, and information bottlenecks inject noise into latent representations. The user's framing is narrower and experimentally useful: sample the intermediate activation distribution in a softmax-like way and compare the behavioral consequences directly to output softmax sampling.
+
+## Hypothesis Decomposition
+
+- H1: Hidden activation sampling changes predictive behavior relative to deterministic inference, measured by accuracy, NLL, ECE, predictive entropy, and probability variance.
+- H2: Hidden activation sampling is not equivalent to final-softmax sampling; it changes internal representations before the classifier head and should therefore produce different calibration and error patterns.
+- H3: Monte Carlo averaging reduces variance for hidden stochastic methods, but may not fully recover deterministic performance if the hidden sampling distribution discards important representational information.
+- H4: SAP-style magnitude-proportional sampling should be less damaging than uniform or categorical one-hot-style hidden sampling because it preserves high-magnitude activations in expectation.
+
+Independent variables are dataset, seed, model type, sampling method, sampling location, and Monte Carlo sample count. Dependent variables are accuracy, NLL, ECE, entropy, Brier score, probability variance, inference time, and per-class accuracy.
+
+## Proposed Methodology
+
+### Approach
+
+Use a compact PyTorch CNN for MNIST-scale image classification so multiple seeds and stochastic inference sweeps can run in a single session. Train a deterministic CNN and a CNN with dropout on MNIST and Fashion-MNIST. At evaluation time, insert stochastic hidden sampling at the penultimate activation vector because this is the closest analogue to sampling over a final softmax class distribution while keeping the classifier head fixed.
+
+### Experimental Steps
+
+1. Validate environment, GPU, package versions, and dataset availability.
+2. Load MNIST and Fashion-MNIST from local HuggingFace `save_to_disk` snapshots.
+3. Create stratified train/validation splits from the original training set and keep the official test set for final evaluation.
+4. Train deterministic and dropout CNNs for each seed with early stopping on validation loss.
+5. Evaluate each saved model under deterministic argmax and output-softmax sampling.
+6. Evaluate hidden interventions at the penultimate representation:
+   - `hidden_categorical`: sample one active dimension from `softmax(abs(h) / tau)` and rescale by the inverse sampling probability.
+   - `sap`: sample a Bernoulli mask over hidden dimensions with probabilities proportional to absolute activations and a target keep fraction, then rescale survivors.
+   - `gaussian`: add zero-mean Gaussian activation noise proportional to hidden activation standard deviation.
+   - `mc_dropout`: keep dropout active during inference for the dropout-trained model.
+7. Repeat stochastic inference for sample counts `S = 1, 5, 20`, averaging probabilities across samples.
+8. Analyze method differences across seeds with paired tests, effect sizes, confidence intervals, and Holm correction for multiple comparisons.
+
+### Baselines
+
+- Deterministic CNN with argmax output: main non-stochastic control.
+- Deterministic CNN with final-softmax class sampling: isolates the common output sampling mechanism.
+- Dropout CNN with dropout disabled at inference: standard regularized baseline.
+- MC dropout at inference: standard hidden stochasticity baseline.
+- Gaussian activation noise: simple continuous activation perturbation baseline.
+- SAP-style activation sampling: closest prior work to sampling hidden activations as a distribution.
+
+### Evaluation Metrics
+
+- Accuracy: primary task performance.
+- Negative log likelihood: probabilistic quality.
+- Expected calibration error with 10 bins: confidence calibration.
+- Brier score: probabilistic calibration and sharpness.
+- Predictive entropy: uncertainty induced by stochastic methods.
+- Mean probability variance across Monte Carlo samples: stochastic prediction diversity.
+- Per-class accuracy and confusion matrices: error analysis.
+- Runtime per test pass: computational cost of Monte Carlo inference.
+
+### Statistical Analysis Plan
+
+For each dataset and method, compute mean and standard deviation across three seeds. Compare each stochastic method to deterministic inference with paired tests on seed-level metrics. With only three paired runs, use paired t-tests as a descriptive parametric test and Wilcoxon signed-rank where SciPy supports it; interpret p-values cautiously and emphasize effect sizes and confidence intervals. Apply Holm correction within each dataset/metric family. Report Cohen's dz for paired differences.
+
+### Resource Plan
+
+Use the existing `.venv` and `uv` dependency tracking. Use GPU `cuda:0` with batch size 256 for MNIST-scale training on RTX A6000 hardware. Store code in `src/`, results in `results/`, figures in `figures/`, logs in `logs/`, and checkpoints in `results/checkpoints/`.
+
+## Expected Outcomes
+
+Results supporting the hypothesis would show hidden sampling shifts calibration, entropy, variance, or accuracy differently from final-softmax sampling. Results refuting the stronger version would show hidden sampling mostly harms performance without improving uncertainty or calibration. A likely outcome is mixed: SAP and Gaussian noise may preserve accuracy better than categorical hidden sampling, while all hidden stochastic methods increase entropy and sample variance relative to deterministic inference.
+
+## Timeline and Milestones
+
+- Planning and environment: completed first.
+- Implementation: build dataset loader, model, sampling modules, training loop, evaluation harness, and analysis scripts.
+- Experimentation: run two datasets, three seeds, and all inference conditions.
+- Analysis: generate summary tables, figures, and statistical comparisons.
+- Documentation: write final `REPORT.md`, `README.md`, and code walkthrough notes where useful.
+
+## Potential Challenges
+
+- Full CIFAR-10 training could exceed the session budget, so CIFAR is deferred unless MNIST/Fashion-MNIST completes quickly.
+- Hidden categorical one-sample vectors may be too destructive; expectation-preserving rescaling and Monte Carlo averaging mitigate this but do not guarantee useful performance.
+- Stochastic methods can appear robust or calibrated due to noise alone; NLL, ECE, entropy, and probability variance are reported together to avoid overclaiming.
+- With three seeds, statistical power is limited; effect sizes and raw seed-level results will be emphasized over binary significance claims.
+
+## Success Criteria
+
+The session succeeds if it produces reproducible code, actual trained-model results on at least MNIST and Fashion-MNIST, saved metrics and figures, and a report that clearly answers whether intermediate activation sampling behaves differently from final-softmax sampling and other stochastic baselines.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          LITERATURE REVIEW
+════════════════════════════════════════════════════════════════════════════════
+
+# Literature Review: Sampling Neural Network
+
+## Review Scope
+
+### Research Question
+
+What is already known about sampling, perturbing, pruning, or modeling uncertainty in intermediate neural network activations, and how should experiments test whether sampling intermediate activations changes network behavior compared with deterministic inference, final-softmax sampling, dropout, and other stochastic baselines?
+
+### Inclusion Criteria
+
+- Methods that introduce stochasticity at hidden activations, stochastic neurons, or stochastic layers.
+- Baselines that are standard for stochastic neural networks, uncertainty, robustness, or calibration.
+- Papers with accessible PDFs, code, or reproducible datasets.
+- Image classification papers using MNIST, Fashion-MNIST, CIFAR-10, or CIFAR-100.
+
+### Exclusion Criteria
+
+- Work only about output sampling without a hidden-layer mechanism.
+- Hardware-only or theory-only work with no clear experimental transfer, unless it directly samples activations.
+- Large-domain datasets that are impractical for a first experiment.
+
+### Search Log
+
+| Date | Query / Source | Results | Notes |
+|------|----------------|---------|-------|
+| 2026-06-16 | Paper-finder script: "sampling from intermediate layer activations stochastic neural networks noisy activations" | Stalled, no usable output | Fallback manual search used. |
+| 2026-06-16 | Web/arXiv: stochastic activation, activation pruning, noisy activation functions | SAP, Noisy Activations, SE-SNN, activation-level uncertainty | Core literature. |
+| 2026-06-16 | Web/arXiv: local reparameterization, dropout Bayesian approximation, information dropout | Variational dropout, MC dropout, Information Dropout | Baselines. |
+| 2026-06-16 | Web/arXiv: Gumbel-Softmax, Concrete, stochastic neurons | Gumbel-Softmax, Concrete, Bengio stochastic neurons | Differentiable categorical sampling references. |
+| 2026-06-16 | GitHub search | 7 repos cloned | Official and baseline implementations. |
+
+## Research Area Overview
+
+The hypothesis sits at the intersection of stochastic neural networks, activation uncertainty, dropout-style regularization, differentiable discrete sampling, adversarial robustness, and calibration. The most direct prior work already demonstrates that hidden activations can be treated as random variables. However, the precise proposed framing, "sample from an intermediate activation distribution in the same spirit as final softmax sampling," is still a useful experimental question because prior methods differ in how they define the distribution, whether sampling happens during training, whether samples are averaged at inference, and whether the goal is accuracy, robustness, uncertainty, compression, or hardware efficiency.
+
+The strongest starting point is to treat the hypothesis as an intervention family rather than a single algorithm:
+
+- **Categorical activation sampling**: normalize an activation vector or channel map into a distribution and sample indices or masks.
+- **Gaussian activation sampling**: predict or estimate mean and variance for an intermediate representation and sample hidden states.
+- **Multiplicative activation noise**: dropout, variational dropout, Information Dropout, or VIB-style stochastic latent encodings.
+- **Structural stochasticity**: sample layers or blocks, as in stochastic depth.
+- **Output-only stochasticity**: sample only from final softmax as a control.
+
+## Key Papers
+
+### Improving deep neural network performance through sampling
+
+- Authors: Ghantasala et al.
+- Year: 2026
+- Key contribution: Introduces probabilistic DNNs using stochastic p-bit activations and sample-aware training.
+- Methodology: Replaces standard activations with stochastic binary activations; averages multiple samples; analyzes energy tradeoffs.
+- Datasets: CIFAR-10, CelebA, MNIST for hardware validation.
+- Results: One 1-bit stochastic sample can match deterministic accuracy in their CIFAR-10 setting; multiple samples improve accuracy, with 2 samples reported as enough to outperform in the main classification setup.
+- Relevance: Closest match to the proposed hypothesis because the stochasticity is in internal activations, not only weights or outputs.
+
+### Simple and Effective Stochastic Neural Networks
+
+- Authors: Yu et al.
+- Year: 2021
+- Key contribution: Models activation uncertainty by predicting Gaussian mean and variance at hidden layers and sampling during the forward pass.
+- Methodology: Adds stochastic learning modules and regularizers that encourage useful activation variability.
+- Datasets: MNIST, CIFAR-10, CIFAR-100.
+- Baselines: VIBNet, variational dropout, Bayesian pruning, dropout calibration, adversarial defenses.
+- Results: Competitive or improved pruning, adversarial defense, label-noise robustness, and calibration. Calibration stabilized after roughly 10 samples in the reported ResNet/CIFAR-100 setting.
+- Relevance: Strong template for measuring more than accuracy: pruning, robustness, label noise, and expected calibration error.
+
+### Activation-level uncertainty in deep neural networks
+
+- Authors: Morales-Alvarez et al.
+- Year: 2021
+- Key contribution: Keeps weights deterministic and models activation functions with 1D Gaussian processes.
+- Methodology: Defines auNNs where stochasticity is moved from weight space to activation functions.
+- Datasets: UCI regression gap splits, large tabular datasets, classification examples.
+- Baselines: Deterministic NNs, BNNs, functional BNNs, deep GPs.
+- Results: Better uncertainty in gaps and out-of-distribution regions than weight-space baselines in their experiments.
+- Relevance: Clear conceptual support for activation-level stochasticity as a distinct modeling axis.
+
+### Stochastic Activation Pruning for Robust Adversarial Defense
+
+- Authors: Dhillon et al.
+- Year: 2018
+- Key contribution: Defines SAP, a post-hoc stochastic activation sampling/pruning method.
+- Methodology: For each activation map, sample activation indices with probability proportional to absolute activation magnitude, zero non-survivors, and rescale survivors by inverse sampling probability.
+- Datasets: CIFAR-10 and reinforcement-learning tasks.
+- Baselines: Dense model, dropout, adversarial training, weight pruning, random noisy activations, random scaled activations.
+- Results: On CIFAR-10 ResNet-20, SAP gave absolute accuracy improvements under FGSM at small perturbation strengths, while sacrificing clean accuracy when sampling was too aggressive.
+- Relevance: Directly operationalizes "sampling from an intermediate activation distribution."
+
+### Noisy Activation Functions
+
+- Authors: Gulcehre et al.
+- Year: 2016
+- Key contribution: Adds noise to activation functions, especially in saturated regions, to permit gradient flow and exploration.
+- Methodology: Noisy hard-tanh and hard-sigmoid variants; optional annealing; deterministic expectation at test time.
+- Datasets: MNIST, Penn Treebank, program execution, translation, captioning.
+- Results: Improved optimization and task performance across several settings.
+- Relevance: Strong baseline for activation noise, but less directly about sampling a probability distribution over activations.
+
+### How Sampling Impacts the Robustness of Stochastic Neural Networks
+
+- Authors: Daubener and Fischer
+- Year: 2022
+- Key contribution: Theoretical and empirical analysis of why stochastic classifiers can resist gradient-based attacks.
+- Methodology: Defines stochastic classifiers as random functions whose predictions are Monte Carlo estimates; studies sample size during attack and inference.
+- Datasets: Fashion-MNIST, CIFAR-10, CIFAR-100.
+- Results: Robustness depends on margins, gradient norms, and angles between attack and inference decision boundaries; attack sample size matters more than inference sample size for evaluating stochastic defenses.
+- Relevance: Important evaluation warning: stochastic activation methods must be attacked with expectation-over-transformation style gradients.
+
+### Variational Dropout and the Local Reparameterization Trick
+
+- Authors: Kingma, Salimans, Welling
+- Year: 2015
+- Key contribution: Converts global weight uncertainty into local activation noise, reducing stochastic-gradient variance.
+- Methodology: Samples pre-activations independently per datapoint.
+- Relevance: Essential baseline because it samples activations for Bayesian efficiency, even though the stochasticity originates from parameter uncertainty.
+
+### Dropout as a Bayesian Approximation
+
+- Authors: Gal and Ghahramani
+- Year: 2016
+- Key contribution: Interprets dropout as approximate Bayesian inference and enables MC dropout uncertainty at test time.
+- Datasets: MNIST and regression/RL examples.
+- Relevance: Standard stochastic baseline and control condition.
+
+### Information Dropout and Deep VIB
+
+- Authors: Achille and Soatto; Alemi et al.
+- Years: 2016 and 2017
+- Key contribution: Treats intermediate representations as noisy or compressed stochastic encodings.
+- Methodology: Multiplicative activation noise or variational bottleneck using the reparameterization trick.
+- Relevance: Strong baselines for "hidden stochastic representation" experiments.
+
+### Gumbel-Softmax, Concrete, and stochastic-neuron estimators
+
+- Authors: Jang et al.; Maddison et al.; Bengio et al.
+- Years: 2013 and 2017
+- Key contribution: Provide differentiable estimators for discrete stochastic nodes.
+- Relevance: Useful if the proposed method samples one-hot or sparse categorical activation states during training rather than only at inference.
+
+### Deep Networks with Stochastic Depth
+
+- Authors: Huang et al.
+- Year: 2016
+- Key contribution: Randomly bypasses residual layers during training.
+- Relevance: Structural stochastic baseline, especially for residual CNNs.
+
+## Common Methodologies
+
+- **Monte Carlo inference**: Draw S forward samples and average logits or probabilities.
+- **Activation masking/pruning**: Sample hidden units or channels, zero the rest, and rescale survivors.
+- **Gaussian latent activations**: Learn or estimate `mu` and `sigma`, sample `z = mu + sigma * epsilon`.
+- **Categorical relaxation**: Use Gumbel-Softmax or Concrete for trainable categorical hidden choices.
+- **Expectation-preserving rescaling**: Keep stochastic hidden activations unbiased in expectation when possible.
+- **Sample-aware training**: Train with the same number or style of samples expected at inference.
+
+## Standard Baselines
+
+- Deterministic network with argmax output.
+- Deterministic network with final-softmax class sampling only.
+- Dropout trained normally and disabled at inference.
+- MC dropout with dropout active at inference.
+- Gaussian activation noise with fixed variance.
+- SAP-style activation pruning.
+- VIB or Information Dropout bottleneck.
+- Local reparameterization variational dropout.
+- Stochastic depth for residual networks.
+
+## Evaluation Metrics
+
+- Clean accuracy and negative log likelihood.
+- Expected calibration error with 10 or 15 bins.
+- Predictive entropy and mutual information for uncertainty.
+- Sample variance of logits/probabilities across stochastic forward passes.
+- Robust accuracy under FGSM/PGD with expectation-over-samples attacks.
+- Accuracy versus number of samples, including latency/compute cost.
+- For compression variants: retained parameters, FLOPs, activation memory.
+
+## Datasets in the Literature
+
+- MNIST: fast smoke test and compatibility with older stochastic-neuron baselines.
+- Fashion-MNIST: useful for robustness analysis and still lightweight.
+- CIFAR-10: primary image classification benchmark for SAP, p-DNN sampling, stochastic depth, and PyTorch baselines.
+- CIFAR-100: useful for calibration and harder classification.
+
+## Gaps and Opportunities
+
+- Existing activation-sampling methods use different distributions and objectives; few compare categorical hidden activation sampling directly against final-softmax sampling as the isolated variable.
+- Many papers train with hidden stochasticity, but fewer evaluate post-hoc hidden sampling on deterministic pretrained networks beyond SAP and p-DNN variants.
+- Robustness claims can be misleading unless attacks use many stochastic samples.
+- Calibration and sample variance are likely more informative than accuracy alone.
+- The most relevant official code is old, so a modern PyTorch implementation will likely be cleaner than trying to run original environments.
+
+## Recommendations for Experiments
+
+- Start with MNIST and CIFAR-10 using a small MLP/CNN and a ResNet-style CIFAR model.
+- Implement a small PyTorch `ActivationSampler` module with modes:
+  - deterministic pass-through,
+  - output softmax sampling only,
+  - categorical activation sampling with Gumbel-Softmax training option,
+  - SAP-style magnitude-proportional mask sampling,
+  - Gaussian activation noise,
+  - MC dropout.
+- Test sampling locations separately: early hidden layer, penultimate representation, and all eligible layers.
+- Sweep sample count `S in {1, 2, 5, 10, 25, 50, 100}` at inference.
+- Report clean accuracy, NLL, ECE, predictive entropy, runtime, and robust accuracy under expectation-over-samples attacks.
+- Compare post-hoc insertion into pretrained deterministic networks versus sample-aware training.
+- Use CIFAR-100 only after CIFAR-10 behavior is stable, mainly for calibration.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          PAPER REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+Generate a complete academic paper with the following structure:
+
+1. TITLE
+   - Clear, specific, informative
+   - Should convey main finding or contribution
+
+2. AUTHOR
+   - Use this exact author line in the \author{} block: Ari Holtzman and NeuriCo
+
+3. ABSTRACT (150-250 words)
+   - Problem statement
+   - Approach
+   - Key results
+   - Significance
+
+4. INTRODUCTION
+   - Research problem and motivation
+   - Gap in existing work
+   - Our contribution (be specific)
+   - Paper organization
+
+5. RELATED WORK
+   - Organized by theme/approach
+   - Position our work relative to prior work
+   - Cite papers from literature review
+
+6. METHODOLOGY
+   - Clear description of approach
+   - Experimental setup
+   - Datasets used
+   - Evaluation metrics
+   - Baselines
+
+7. RESULTS
+   - Present results with tables and figures
+   - Statistical analysis
+   - Comparison to baselines
+   - Ablation studies (if applicable)
+
+8. DISCUSSION
+   - Interpretation of results
+   - Limitations
+   - Broader implications
+
+9. CONCLUSION
+   - Summary of contributions
+   - Key findings
+   - Future work
+
+10. REFERENCES
+   - BibTeX format
+   - All cited papers
+
+════════════════════════════════════════════════════════════════════════════════
+                          OUTPUT FORMAT
+════════════════════════════════════════════════════════════════════════════════
+
+Create a MODULAR LaTeX project with the following directory structure:
+
+paper_draft/
+├── main.tex              # Main file that imports all sections
+├── references.bib        # BibTeX references
+├── sections/
+│   ├── abstract.tex      # Abstract content
+│   ├── introduction.tex  # Introduction section
+│   ├── related_work.tex  # Related work section
+│   ├── methodology.tex   # Methodology section
+│   ├── results.tex       # Results section
+│   ├── discussion.tex    # Discussion section
+│   └── conclusion.tex    # Conclusion section
+├── figures/              # Directory for any generated figures
+├── tables/               # Directory for complex standalone tables
+└── appendix/             # Directory for appendix sections (if needed)
+
+INSTRUCTIONS:
+1. First, create the directory structure above (mkdir -p paper_draft/sections paper_draft/figures paper_draft/tables paper_draft/appendix)
+2. Write main.tex using the EXACT preamble for NEURIPS:
+
+   \documentclass{article}
+   \usepackage[final]{neurips_2025}  % NEURIPS style (neurips_2025.sty is in paper_draft/)
+   \usepackage[hidelinks]{hyperref}  % REQUIRED: clickable links
+   \usepackage{booktabs}  % REQUIRED: professional tables
+   \usepackage{graphicx}
+   \usepackage{amsmath,amssymb}
+
+   % Import command files
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+   % Use this bibliography style:
+   \bibliographystyle{plainnat}
+
+   \author{Ari Holtzman and NeuriCo}
+
+   - Use \input{sections/...} to include each section
+   - Use \bibliography{references} for references
+3. Write each section file with COMPLETE content (no placeholders)
+4. Each section file should include its \section{} command
+5. Write references.bib with all citations in BibTeX format
+6. After writing all files, compile the paper:
+   cd paper_draft && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex
+
+This modular structure allows humans to easily:
+- Edit individual sections without navigating a large file
+- Track changes per section
+- Reuse sections across different paper versions
+
+════════════════════════════════════════════════════════════════════════════════
+                          QUALITY REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+- Academic tone throughout
+- All claims must be supported by data from the experiment report
+- Proper citations using \cite{} commands
+- Clear figures and tables with proper captions
+- NO placeholder text - every section must have real content
+- The paper MUST compile without errors
+- If compilation fails, debug and fix the LaTeX errors
+
+════════════════════════════════════════════════════════════════════════════════
+                          LAB WRITING STYLE
+════════════════════════════════════════════════════════════════════════════════
+
+Follow these lab-specific conventions to match our paper style:
+
+1. LANGUAGE STYLE:
+   - Use active voice: "We propose", "We examine", "We focus on"
+   - Be direct and confident: "Our main question is...", "We hypothesize that..."
+   - State things clearly and simply - prefer plain language over jargon
+   - Use bold questions as paragraph organizers: {\bf what is X?}
+   - Include specific quantitative claims: "8.97% over baseline"
+   - Avoid fancy wording: "utilize" → "use", "facilitate" → "help"
+
+2. INTRODUCTION STRUCTURE:
+   - Engaging hook (get to the point quickly)
+   - Problem importance
+   - Gap identification
+   - Your approach with method figure reference
+   - Quantitative preview of results
+   - Contribution bullets (3-4 items, action verbs)
+
+3. CONTRIBUTION LISTS:
+   \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+       \item We propose...
+       \item We conduct...
+       \item We complement...
+   \end{itemize}
+
+4. MODULAR COMMANDS STRUCTURE:
+   Command templates are pre-copied to paper_draft/commands/:
+   - math.tex: Math notation macros
+   - general.tex: Formatting macros
+   - macros.tex: Project-specific term definitions (customize this for your paper)
+
+   In main.tex, include:
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+5. REFERENCE CONVENTIONS:
+   Use reference macros from math.tex:
+   - \figref{fig:name} for "figure 1" (lowercase, in-sentence)
+   - \Figref{fig:name} for "Figure 1" (capitalized, start of sentence)
+   - \secref{sec:name} for "section 2"
+
+6. TEXT FORMATTING:
+   - Use \para{Header text} for bold paragraph headers
+   - Define method/dataset names with \textsc and \xspace:
+     \newcommand{\methodname}{\textsc{MethodName}\xspace}
+
+7. TABLE FORMATTING:
+   - Use booktabs package (no vertical lines)
+   - Use \resizebox{\textwidth}{!}{...} for wide tables
+   - Use @{} to remove padding at table edges
+   - Use \cmidrule(lr){x-y} for sub-headers
+   - Use \textsc{} for dataset/method names in headers
+   - Bold best results with {\bf ...}
+
+8. FIGURE FORMATTING:
+   - Use 0.32\textwidth for 3-column subfigures
+   - Use 0.95\linewidth for full-width figures
+   - Use \input{figures/legend} for shared legends
+   - Write self-contained captions explaining key observations
+
+9. RESULTS PRESENTATION:
+   - Define \increase and \decrease for colored arrows (green up, red down)
+   - Bold best results in tables
+   - Report confidence intervals when available
+
+10. ALGORITHM STYLING:
+    - Use algpseudocode with [noend]
+    - Use \triangleright for comments
+
+11. HYPERLINKS (REQUIRED):
+    - Always use \usepackage[hidelinks]{hyperref} or with colored links
+    - All citations, section refs, figure refs, table refs must be clickable
+    - This is essential for reader navigation
+
+════════════════════════════════════════════════════════════════════════════════
+                          WORKFLOW: REVIEW AND REFLECT
+════════════════════════════════════════════════════════════════════════════════
+
+Before calling finish, you MUST complete these review steps:
+
+1. REVIEW RESOURCES (at the start):
+   - Read .codex/skills/paper-writer/SKILL.md for detailed guidance
+   - Study templates/paper_writing/lab_style_guide.md for style conventions
+   - Browse paper_examples/ for formatting and language patterns
+
+2. SELF-REFLECTION (before finishing):
+   After writing all sections, review your work against these criteria:
+
+   LANGUAGE CHECK:
+   - [ ] Is the writing clear and jargon-free?
+   - [ ] Are claims specific with quantitative support?
+   - [ ] Is active voice used throughout?
+
+   FORMATTING CHECK:
+   - [ ] Does main.tex include \input{commands/math}, \input{commands/general}, \input{commands/macros}?
+   - [ ] Is hyperref package included for clickable references?
+   - [ ] Do tables use booktabs (no vertical lines)?
+   - [ ] Are best results bolded in tables?
+   - [ ] Are figures/tables properly captioned?
+
+   STRUCTURE CHECK:
+   - [ ] Does introduction follow: hook → importance → gap → approach → preview → contributions?
+   - [ ] Are contribution bullets specific with action verbs?
+   - [ ] Does the paper compile without errors?
+
+3. FIX ISSUES:
+   - Address any issues found in the self-reflection
+   - Re-compile and verify the PDF looks correct
+
+Only after completing this review should you consider the paper finished.

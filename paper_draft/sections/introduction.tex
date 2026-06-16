@@ -1,0 +1,22 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Sampling from a final softmax is a familiar operation: the network computes logits, converts them to probabilities, and draws a class or token from that distribution. The hidden layers that produced those logits are usually treated differently. They are deterministic vectors that the classifier head reads once. Our main question is simple: what happens if an intermediate activation vector is also treated as a distribution and sampled from?
+
+This question matters because the location of stochasticity changes what uncertainty can mean. Output sampling changes the readout while leaving the computation intact. Hidden-layer sampling changes the representation before later layers act on it. That distinction is important for calibration, prediction diversity, robustness claims, and any method that tries to express uncertainty without placing a full distribution over weights.
+
+Prior work already shows that stochastic hidden computations can be useful. Stochastic activation pruning samples activation indices with probabilities tied to activation magnitude \cite{dhillon2018stochastic}. Stochastic neural networks can model Gaussian activation uncertainty \cite{yu2021simple}, and activation-level uncertainty can be represented with stochastic activation functions \cite{moralesalvarez2021activation}. Dropout, variational dropout, information bottlenecks, and stochastic depth also inject randomness before the final prediction \cite{gal2016dropout,kingma2015variational,achille2016information,alemi2017deep,huang2016deep}. However, these lines of work usually optimize specialized objectives or target robustness, compression, or uncertainty estimation. They rarely isolate the narrower comparison: hidden activation sampling versus final-softmax sampling under the same trained model and evaluation pipeline.
+
+We examine that comparison directly. \figref{fig:method} summarizes the setup. We train compact \cnn classifiers with a 128-dimensional penultimate hidden layer on \mnist and \fashionmnist, then evaluate deterministic inference, final-softmax label sampling, categorical sampling over hidden dimensions, \sap-style hidden masking, Gaussian hidden perturbations, and \mcdropout. Each stochastic method is evaluated with $S \in \{1,5,20\}$ samples, and we average predictive probabilities across samples.
+
+The result is not subtle. At $S=20$, \hiddencategorical reduces accuracy from 98.55\% to 79.41\% on \mnist and from 88.77\% to 66.30\% on \fashionmnist. It also raises predictive entropy by 1.265 on \mnist and 1.178 on \fashionmnist. By contrast, \sap and \gaussian hidden sampling preserve deterministic accuracy almost exactly, while final-softmax sampling preserves accuracy but worsens empirical sampled-probability \nll from 0.044 to 0.112 on \mnist and from 0.310 to 0.734 on \fashionmnist.
+
+Our contributions are:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item We define a controlled comparison between output-only sampling and intermediate activation sampling in the same trained \cnn pipeline.
+    \item We evaluate categorical hidden sampling, \sap-style sampling, Gaussian activation noise, and \mcdropout across two datasets, three seeds, and three Monte Carlo sample counts.
+    \item We show that naive categorical hidden sampling is highly disruptive, while \sap and Gaussian hidden noise preserve accuracy and mainly change uncertainty statistics.
+    \item We identify sample-aware training and structured hidden distributions as the next step for turning hidden sampling into a useful modeling tool.
+\end{itemize}
+
+The rest of the paper reviews related work in stochastic hidden representations (\secref{sec:related}), describes the experimental methodology (\secref{sec:methodology}), reports the quantitative results (\secref{sec:results}), and discusses limitations and future directions (\secref{sec:discussion}).

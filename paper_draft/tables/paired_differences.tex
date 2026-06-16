@@ -1,0 +1,21 @@
+\begin{table}[t]
+    \centering
+    \caption{Key paired differences versus deterministic inference for deterministic-model methods at $S=20$. Accuracy differences are percentage points; other differences are raw metric units. Holm-corrected $p$-values are descriptive because $n=3$ seeds.}
+    \label{tab:paired_differences}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{@{}llrrrr@{}}
+        \toprule
+        Dataset & Method & $\Delta$ Acc. & $\Delta$ \nll & $\Delta$ \ece & $\Delta$ Entropy \\
+        \midrule
+        \mnist & \gaussian & -0.01 & 0.001 & 0.001 & 0.013 \\
+        \mnist & \hiddencategorical & -19.13 & 0.789 & 0.252 & 1.265 \\
+        \mnist & \outputsample & -0.03 & 0.069 & 0.001 & -0.007 \\
+        \mnist & \sap & -0.03 & 0.011 & 0.015 & 0.060 \\
+        \midrule
+        \fashionmnist & \gaussian & -0.02 & 0.001 & -0.002 & 0.031 \\
+        \fashionmnist & \hiddencategorical & -22.46 & 0.723 & 0.192 & 1.178 \\
+        \fashionmnist & \outputsample & -0.23 & 0.424 & 0.004 & -0.037 \\
+        \fashionmnist & \sap & -0.15 & 0.010 & 0.014 & 0.085 \\
+        \bottomrule
+    \end{tabular}}
+\end{table}

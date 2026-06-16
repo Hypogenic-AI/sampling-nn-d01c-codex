@@ -1,0 +1,23 @@
+\begin{figure}[t]
+    \centering
+    \resizebox{0.95\linewidth}{!}{%
+    \begin{tabular}{@{}ccccc@{}}
+        \toprule
+        Input image & Feature extractor & Penultimate vector & Sampling intervention & Prediction \\
+        \midrule
+        $\vx$ &
+        $g_\theta(\vx)$ &
+        $\vh \in \sR^{128}$ &
+        $\tilde{\vh}^{(s)} \sim \{\hiddencategorical,\sap,\gaussian,\mcdropout\}$ &
+        $\frac{1}{S}\sum_s \softmax(c_\theta(\tilde{\vh}^{(s)}))$ \\
+        \addlinespace
+        $\vx$ &
+        $g_\theta(\vx)$ &
+        $\vh$ &
+        $y^{(s)} \sim \Categorical(\softmax(c_\theta(\vh)))$ &
+        output-sample counts \\
+        \bottomrule
+    \end{tabular}}
+    \caption{Experimental comparison. Hidden sampling modifies the penultimate representation before the classifier head. Output sampling leaves the representation fixed and samples only from the final softmax.}
+    \label{fig:method}
+\end{figure}

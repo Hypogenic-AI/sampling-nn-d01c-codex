@@ -1,0 +1,9 @@
+{
+  "required_files_checked": 17,
+  "metrics_rows": 102,
+  "summary_rows": 34,
+  "statistical_test_rows": 40,
+  "repeat_eval_method": "mnist seed42 deterministic sap S=5",
+  "repeat_eval_accuracy": 0.9844,
+  "status": "passed"
+}

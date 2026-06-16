@@ -1,0 +1,17 @@
+\section{Related Work}
+\label{sec:related}
+
+\para{Activation sampling and pruning.}
+The closest prior method is stochastic activation pruning (\sap), which samples activation indices with probability proportional to activation magnitude and rescales survivors to preserve the expected activation \cite{dhillon2018stochastic}. \sap was proposed as a post-hoc stochastic defense, but its mechanism is directly relevant to our question because it turns hidden activations into a sampling distribution. More recent p-bit activation work also studies internal stochastic activations and sample-aware inference \cite{ghantasala2026improving}. Unlike these papers, we do not propose a new defense or hardware mechanism. We use \sap and categorical hidden sampling as controlled interventions to ask whether hidden sampling behaves like output sampling.
+
+\para{Activation uncertainty and activation noise.}
+Several methods put uncertainty at the activation level rather than only at the weights. Yu et al. predict Gaussian activation means and variances, then sample hidden activations during forward passes \cite{yu2021simple}. Morales-Alvarez et al. move uncertainty into activation functions with Gaussian-process activation models \cite{moralesalvarez2021activation}. Noisy activation functions inject noise into nonlinearities to improve optimization and exploration \cite{gulcehre2016noisy}. The local reparameterization trick also converts weight uncertainty into local activation noise to reduce gradient variance \cite{kingma2015variational}. We build on this view that hidden activations can be random variables, but we focus on post-hoc inference behavior under matched deterministic models.
+
+\para{Dropout and stochastic bottlenecks.}
+Dropout is a standard hidden-stochastic baseline. Its Bayesian interpretation motivates Monte Carlo dropout at test time as an approximate uncertainty estimator \cite{gal2016dropout}. Information Dropout and the variational information bottleneck use noisy intermediate representations to control information flow \cite{achille2016information,alemi2017deep}. Stochastic depth randomly drops residual blocks during training \cite{huang2016deep}. These methods differ from our hidden categorical sampler because their stochasticity is either trained into the model, applied multiplicatively, or structured at the layer level. We include \mcdropout to anchor our results against a familiar stochastic baseline.
+
+\para{Discrete stochastic nodes.}
+Sampling hidden dimensions creates discrete stochastic computation. Gradient estimators for stochastic neurons and conditional computation provide one route for training such models \cite{bengio2013estimating}. Gumbel-Softmax and Concrete relaxations provide differentiable approximations to categorical sampling \cite{jang2017categorical,maddison2017concrete}. Our experiments do not train through categorical hidden samples; they test the post-hoc effect first. The strong degradation we observe suggests that differentiable or sample-aware training is likely necessary if categorical hidden sampling is to become a practical method.
+
+\para{Stochastic robustness evaluation.}
+Stochastic classifiers require careful robustness evaluation because attack and inference sample counts can change conclusions \cite{daubener2022sampling}. We do not run robustness attacks in this first study. This choice keeps the experiment focused on clean accuracy, calibration, entropy, and variance, and avoids overclaiming robustness from stochasticity alone.

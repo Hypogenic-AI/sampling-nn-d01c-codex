@@ -1,0 +1,20 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\para{Hidden sampling changes the computation.}
+The experiments support the behavioral hypothesis: sampling intermediate activations is not equivalent to sampling from the final softmax. \outputsample leaves the learned representation and classifier head intact, so averaging enough samples recovers the decision behavior of the original model. Hidden sampling changes the vector consumed by the classifier head, so it can change class margins, confidence, calibration, and errors before the final softmax is ever formed.
+
+\para{The categorical sampler is too destructive post hoc.}
+The strongest result is also a warning. A direct ``softmax over hidden magnitudes, sample dimensions, and rescale'' rule removes too much representational information from a normally trained \cnn. Even expectation-style rescaling and 20 Monte Carlo samples do not restore deterministic accuracy. This does not mean categorical hidden sampling is impossible; it means the naive post-hoc version is mismatched to the representation. More plausible designs include sample-aware training, grouped or channel-level sampling, Gumbel-Softmax training relaxations, or a learned stochastic bottleneck.
+
+\para{Continuous and magnitude-aware hidden noise is less disruptive.}
+\sap and \gaussian behave differently because they preserve more of the penultimate representation. \sap keeps high-magnitude coordinates more often and rescales survivors, while \gaussian perturbs the hidden vector continuously. Both interventions preserve accuracy on \mnist and \fashionmnist while increasing entropy and probability variance. In this setup, their value is not better accuracy; it is a controlled way to change uncertainty statistics without destroying task performance.
+
+\para{Interpreting output-sampling NLL.}
+The \outputsample \nll numbers should be read as empirical sampled-distribution quality, not the model's analytic softmax quality. With $S=20$, the sampled probability assigned to a class is a multiple of $1/20$, so the distribution is coarse. This explains why accuracy can remain high while empirical \nll worsens. The contrast is still useful because it shows that output sampling and hidden sampling fail in different ways.
+
+\para{Limitations.}
+This study uses only \mnist and \fashionmnist, a compact \cnn, three seeds, and a single penultimate sampling location. Larger datasets, residual networks, transformers, spatial feature maps, and channel-wise sampling may behave differently. We also evaluate post-hoc sampling rather than training with the stochastic mechanism active. Finally, we do not make robustness claims. Stochastic defenses require expectation-over-transformation attacks and careful control of attack-time sample counts \cite{daubener2022sampling}.
+
+\para{Broader implications.}
+The results argue for treating intermediate stochasticity as a modeling choice rather than a cosmetic change to inference. Useful hidden sampling needs a distribution that respects the geometry of learned representations and an objective that teaches downstream layers to consume sampled states. Without that alignment, hidden sampling can produce uncertainty, but the uncertainty comes from damaging the representation rather than from calibrated ambiguity.

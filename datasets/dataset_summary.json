@@ -1,0 +1,34 @@
+{
+  "mnist": {
+    "source": "ylecun/mnist",
+    "splits": {
+      "train": 60000,
+      "test": 10000
+    },
+    "location": "datasets/mnist"
+  },
+  "fashion_mnist": {
+    "source": "zalando-datasets/fashion_mnist",
+    "splits": {
+      "train": 60000,
+      "test": 10000
+    },
+    "location": "datasets/fashion_mnist"
+  },
+  "cifar10": {
+    "source": "uoft-cs/cifar10",
+    "splits": {
+      "train": 50000,
+      "test": 10000
+    },
+    "location": "datasets/cifar10"
+  },
+  "cifar100": {
+    "source": "uoft-cs/cifar100",
+    "splits": {
+      "train": 50000,
+      "test": 10000
+    },
+    "location": "datasets/cifar100"
+  }
+}

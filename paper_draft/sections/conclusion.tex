@@ -1,0 +1,6 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We tested whether sampling an intermediate activation distribution changes neural-network behavior differently from deterministic inference and final-softmax sampling. In a controlled \cnn study on \mnist and \fashionmnist, the answer is yes. Naive categorical hidden sampling sharply reduces accuracy and worsens calibration, while \sap-style and Gaussian hidden sampling preserve accuracy and mainly increase entropy and predictive variance. Final-softmax sampling behaves differently again: it preserves accuracy with enough samples, but its empirical sampled probabilities degrade \nll.
+
+The key takeaway is that hidden activation sampling is a representation-level intervention. It cannot be assumed to inherit the benign behavior of output sampling. The next experiments should train with the sampling mechanism active, test structured channel or spatial sampling, and move to CIFAR-scale models with robustness and calibration evaluations.

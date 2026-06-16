@@ -1,0 +1,8 @@
+PDF: papers/2021_yu_simple_effective_stochastic_neural_networks.pdf
+Total pages: 9
+Pages per chunk: 3
+
+Chunks:
+  2021_yu_simple_effective_stochastic_neural_networks_chunk_001.pdf: pages 1-3
+  2021_yu_simple_effective_stochastic_neural_networks_chunk_002.pdf: pages 4-6
+  2021_yu_simple_effective_stochastic_neural_networks_chunk_003.pdf: pages 7-9

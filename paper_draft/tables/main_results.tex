@@ -1,0 +1,27 @@
+\begin{table}[t]
+    \centering
+    \caption{Primary test metrics. Accuracy is mean $\pm$ standard deviation across three seeds. Stochastic methods use $S=20$. Bold marks the best accuracy and lowest \nll/\ece within each dataset.}
+    \label{tab:main_results}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{@{}lllrrrrr@{}}
+        \toprule
+        Dataset & Model & Method & Acc. (\%) & \nll & \ece & Entropy & Prob. var. \\
+        \midrule
+        \fashionmnist & deterministic & \deterministic & 88.77 $\pm$ 0.16 & 0.310 & 0.010 & 0.286 & 0.0000 \\
+        \fashionmnist & deterministic & \gaussian & 88.75 $\pm$ 0.16 & 0.310 & {\bf 0.008} & 0.317 & 0.0013 \\
+        \fashionmnist & deterministic & \hiddencategorical & 66.30 $\pm$ 13.40 & 1.032 & 0.202 & 1.464 & 0.0228 \\
+        \fashionmnist & deterministic & \outputsample & 88.53 $\pm$ 0.13 & 0.734 & 0.015 & 0.249 & 0.0143 \\
+        \fashionmnist & deterministic & \sap & 88.61 $\pm$ 0.03 & 0.320 & 0.024 & 0.371 & 0.0037 \\
+        \fashionmnist & dropout & \dropouteval & {\bf 89.06 $\pm$ 0.36} & {\bf 0.305} & 0.008 & 0.282 & 0.0000 \\
+        \fashionmnist & dropout & \mcdropout & 89.00 $\pm$ 0.25 & 0.307 & 0.009 & 0.328 & 0.0011 \\
+        \midrule
+        \mnist & deterministic & \deterministic & 98.55 $\pm$ 0.12 & 0.044 & 0.002 & 0.040 & 0.0000 \\
+        \mnist & deterministic & \gaussian & 98.53 $\pm$ 0.12 & 0.044 & 0.003 & 0.053 & 0.0004 \\
+        \mnist & deterministic & \hiddencategorical & 79.41 $\pm$ 9.27 & 0.833 & 0.254 & 1.304 & 0.0197 \\
+        \mnist & deterministic & \outputsample & 98.51 $\pm$ 0.18 & 0.112 & 0.003 & 0.032 & 0.0019 \\
+        \mnist & deterministic & \sap & 98.51 $\pm$ 0.12 & 0.055 & 0.017 & 0.100 & 0.0017 \\
+        \mnist & dropout & \dropouteval & 98.81 $\pm$ 0.13 & {\bf 0.036} & {\bf 0.002} & 0.035 & 0.0000 \\
+        \mnist & dropout & \mcdropout & {\bf 98.82 $\pm$ 0.14} & 0.038 & 0.006 & 0.059 & 0.0005 \\
+        \bottomrule
+    \end{tabular}}
+\end{table}
